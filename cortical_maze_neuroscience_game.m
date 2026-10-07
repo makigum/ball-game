@@ -21,6 +21,7 @@ state.phase = 'menu'; % Starts the program on the menu screen instead of immedia
 state.mode = 1; % Selects the default neuron type, with mode 1 representing a pyramidal/glutamatergic neuron.
 state.running = false; % Keeps the movement loop inactive until the player deliberately starts the game.
 state.quit = false; % Stores whether the user has requested that the program terminate.
+state.quitArmUntil = 0; % Tracks the deadline for a confirming second Q/ESC press so one accidental tap cannot instantly end a run.
 state.paused = false; % Stores whether gameplay is temporarily paused by the spacebar.
 state.gameOver = false; % Records whether the active run has reached a win or lose condition.
 state.score = 0; % Initializes the cumulative score used to reward efficient movement and correct molecular choices.
@@ -111,19 +112,29 @@ end % Ends the figure cleanup check.
                 state.message = 'Mode selected: interneuron - tangential first, then radial.'; % Links the mode to the documented two-step migration strategy.
                 state.messageUntil = inf; % Keeps the selection message visible until the next menu action.
                 state.phaseDirty = true; % Requests a menu refresh so the highlighted choice changes on screen.
+            elseif strcmp(key,'leftarrow') || strcmp(key,'left') % Lets the left arrow highlight the pyramidal card, matching its position on the left side of the menu.
+                state.mode = 1; % Stores pyramidal/glutamatergic migration as the selected game mode.
+                state.message = 'Mode selected: pyramidal neuron - radial migration.'; % Gives immediate feedback linking the mode to the neuroscience concept.
+                state.messageUntil = inf; % Keeps the selection message visible until the player starts or changes it.
+                state.phaseDirty = true; % Requests a menu refresh so the highlighted choice changes on screen.
+            elseif strcmp(key,'rightarrow') || strcmp(key,'right') % Lets the right arrow highlight the interneuron card, matching its position on the right side of the menu.
+                state.mode = 2; % Stores interneuron/GABAergic migration as the selected game mode.
+                state.message = 'Mode selected: interneuron - tangential first, then radial.'; % Links the mode to the documented two-step migration strategy.
+                state.messageUntil = inf; % Keeps the selection message visible until the next menu action.
+                state.phaseDirty = true; % Requests a menu refresh so the highlighted choice changes on screen.
             elseif strcmp(key,'return') || strcmp(key,'space') % Checks for the enter or space key as the universal start command.
                 reset_game(); % Initializes a new run using the currently selected neuron type and starts the maze.
             elseif strcmp(key,'escape') || strcmp(key,'q') % Checks for either escape or q as a quit command.
                 state.quit = true; % Requests clean termination of the program.
             end % Ends the menu key-choice logic.
         elseif strcmp(state.phase,'playing') % Checks whether the same keyboard input should instead control the active neuron.
-            if strcmp(key,'uparrow') || strcmp(key,'w') % Maps the up arrow and W key to upward migration.
+            if strcmp(key,'uparrow') || strcmp(key,'up') || strcmp(key,'w') % Maps the up arrow (both Octave/MATLAB key-name spellings) and W key to upward migration.
                 state.direction = [0 1]; % Stores an upward one-cell direction so the player can move toward superficial layers.
-            elseif strcmp(key,'downarrow') || strcmp(key,'s') % Maps the down arrow and S key to downward migration.
+            elseif strcmp(key,'downarrow') || strcmp(key,'down') || strcmp(key,'s') % Maps the down arrow (both spellings) and S key to downward migration.
                 state.direction = [0 -1]; % Stores a downward one-cell direction for backtracking and route planning.
-            elseif strcmp(key,'leftarrow') || strcmp(key,'a') % Maps the left arrow and A key to leftward movement.
+            elseif strcmp(key,'leftarrow') || strcmp(key,'left') || strcmp(key,'a') % Maps the left arrow (both spellings) and A key to leftward movement.
                 state.direction = [-1 0]; % Stores a leftward one-cell direction for tangential travel and maze exploration.
-            elseif strcmp(key,'rightarrow') || strcmp(key,'d') % Maps the right arrow and D key to rightward movement.
+            elseif strcmp(key,'rightarrow') || strcmp(key,'right') || strcmp(key,'d') % Maps the right arrow (both spellings) and D key to rightward movement.
                 state.direction = [1 0]; % Stores a rightward one-cell direction for tangential travel and maze exploration.
             elseif strcmp(key,'space') % Checks whether the player pressed the spacebar during active play.
                 state.paused = ~state.paused; % Toggles pause status so the player can stop the moving maze without losing progress.
@@ -141,7 +152,13 @@ end % Ends the figure cleanup check.
                 state.message = 'Memory aid used: -3 points.'; % Tells the player why the score changed and frames the tool as assistance rather than punishment.
                 state.messageUntil = toc(state.gameClock) + 1.5; % Shows the feedback briefly so it does not dominate the screen.
             elseif strcmp(key,'escape') || strcmp(key,'q') % Checks for escape or q during active play.
-                state.quit = true; % Exits the game cleanly without needing a separate quit button.
+                if toc(state.gameClock) <= state.quitArmUntil % Checks whether this is the confirming second press within the short arming window.
+                    state.quit = true; % Exits the game cleanly now that the player has confirmed the quit.
+                else % Handles the first press, which only arms the quit instead of exiting immediately.
+                    state.quitArmUntil = toc(state.gameClock) + 2; % Opens a brief window during which a repeat press confirms the quit.
+                    state.message = 'Press Q or ESC again to quit - any other key cancels.'; % Prevents a single accidental tap next to W/A/S/D from silently ending the run.
+                    state.messageUntil = toc(state.gameClock) + 2; % Keeps the confirmation prompt visible for the same duration as the arming window.
+                end % Ends the quit-confirmation check.
             end % Ends the active gameplay key-choice logic.
         elseif strcmp(state.phase,'end') % Checks whether key input should control the results screen.
             if strcmp(key,'r') || strcmp(key,'return') || strcmp(key,'space') % Allows any of three intuitive keys to restart immediately.
@@ -159,6 +176,7 @@ end % Ends the figure cleanup check.
         state.phase = 'playing'; % Changes the state machine from menu or end screen into live gameplay.
         state.running = true; % Marks the run as active for clarity even though the phase variable controls the loop.
         state.paused = false; % Ensures a restarted game never begins in a paused state.
+        state.quitArmUntil = 0; % Clears any pending quit-confirmation window left over from a previous run.
         state.gameOver = false; % Clears any previous win or loss flag so the new run can progress normally.
         state.score = 0; % Resets the player's score for a fair new attempt.
         state.lives = 3; % Restores the full set of three mistake tokens.
@@ -362,8 +380,9 @@ end % Ends the figure cleanup check.
         text(22.5,14.25,'2  Interneuron','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',[0.50 0.25 0.46]); % Labels the inhibitory interneuron mode.
         text(22.5,13.25,'Tangential migration, then radial integration','HorizontalAlignment','center','FontSize',11,'Color',[0.49 0.35 0.45]); % Explains the two-phase migration represented in the game.
         text(22.5,12.35,'Starts from an MGE/CGE-like side zone','HorizontalAlignment','center','FontSize',10,'Color',[0.56 0.44 0.54]); % Connects the start region to the documented subpallial origin of interneurons.
+        text(15.5,10.55,'Press 1 / 2 or LEFT / RIGHT arrow to choose, then ENTER or SPACE to begin.','HorizontalAlignment','center','FontSize',10,'Color',[0.30 0.34 0.42]); % Documents both selection methods now that arrow keys work on the menu.
         text(15.5,9.65,'CONTROLS','HorizontalAlignment','center','FontSize',13,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces the control section before the player starts.
-        text(15.5,8.55,'Arrow keys or W A S D = move    SPACE = pause    H = 3-second marker guide    Q/ESC = quit','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.38 0.48]); % Gives every gameplay control in one compact line.
+        text(15.5,8.55,'Arrow keys or W A S D = move    SPACE = pause    H = 3-second marker guide    Q/ESC twice = quit','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.38 0.48]); % Gives every gameplay control in one compact line and documents the new quit confirmation.
         text(15.5,7.45,'Gameplay: reach the correct molecular cue, learn the layer order, and use the maze efficiently.','HorizontalAlignment','center','FontSize',11,'Color',[0.25 0.32 0.44]); % Explains that navigation and biological identification are coupled rather than separate quizzes.
         text(15.5,6.35,'Correct cues grow your score and unlock the next stage; wrong cues cost a life.','HorizontalAlignment','center','FontSize',10,'Color',[0.40 0.44 0.52]); % Makes the win/lose logic understandable before the first move.
         text(15.5,4.85,'Adaptive learning: struggling opens extra shortcuts; fast accurate play keeps the maze tighter.','HorizontalAlignment','center','FontSize',10,'Color',[0.34 0.40 0.50]); % Explains how the dynamic maze changes based on the player's performance.
