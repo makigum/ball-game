@@ -549,11 +549,15 @@ end % Ends the figure cleanup check.
         if state.paused || state.gameOver % Stops all movement logic when the player has deliberately paused or the game has ended.
             return; % Leaves the function immediately so paused/end states remain stable until a key action changes them.
         end % Ends the movement-guard check.
+        if all(state.direction == 0) % Stops repeated bumps once the neuron has already been halted at a wall or boundary.
+            return; % Leaves the function immediately since there is no direction to move in.
+        end % Ends the no-direction guard.
         nextPos = state.player + state.direction; % Computes the candidate next cell from the current position and selected direction.
         if nextPos(1) < 1 || nextPos(1) > state.cols || nextPos(2) < 1 || nextPos(2) > state.rows % Checks whether the candidate would leave the playable grid boundary.
             state.score = max(0,state.score - 1); % Applies a tiny score penalty for trying to move outside the cortex-like board.
             state.message = 'Boundary bump - stay inside the developing cortex.'; % Provides immediate spatial feedback rather than silently ignoring the input.
             state.messageUntil = toc(state.gameClock) + 0.8; % Shows the boundary feedback briefly so it does not become distracting.
+            state.direction = [0 0]; % Halts automatic movement so the boundary bump does not repeat every tick.
             return; % Rejects the invalid move without changing the neuron position.
         end % Ends the boundary check.
         if blocked_by_wall(state.player,nextPos) % Checks whether the requested movement is blocked by the current maze wall structure.
@@ -561,6 +565,7 @@ end % Ends the figure cleanup check.
             state.score = max(0,state.score - 1); % Applies a small non-catastrophic penalty so exploratory navigation remains possible.
             state.message = 'Wall bump - try a different pathway.'; % Encourages route planning instead of rewarding brute-force movement.
             state.messageUntil = toc(state.gameClock) + 0.8; % Displays the hint briefly so the HUD remains readable.
+            state.direction = [0 0]; % Halts automatic movement so the wall bump does not repeat every tick.
             return; % Cancels the blocked move and leaves the neuron in its current cell.
         end % Ends the maze-wall collision check.
         state.player = nextPos; % Commits the movement so the neuron enters the chosen neighboring cell.
