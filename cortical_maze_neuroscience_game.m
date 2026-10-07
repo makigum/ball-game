@@ -44,6 +44,7 @@ state.stageClock = tic; % Creates a stage timer used to compute speed bonuses an
 state.phaseDirty = true; % Requests an initial menu render because nothing has yet been drawn.
 state.mazeDirty = true; % Requests an initial maze render once play begins.
 state.direction = [0 1]; % Gives the player an initial upward direction that fits radial migration.
+state.facing = [0 1]; % Remembers the last real heading so the neuron's dendrites/axon still point somewhere after a wall stops state.direction at [0 0].
 state.player = [5 1]; % Places the default pyramidal neuron inside the ventricular-zone area near the bottom of the cortex.
 state.trail = []; % Starts with an empty short-lived migration trace that will grow as the neuron moves.
 state.rows = 18; % Defines the number of maze rows and simultaneously provides enough vertical room for the major cortical compartments.
@@ -57,6 +58,9 @@ state.targetInfo = struct(); % Creates an empty structure that will later hold t
 state.shortcutCount = 0; % Stores the number of adaptive maze shortcuts currently available.
 state.playerHandle = []; % Reserves the graphics handle for the cartoon neuron body.
 state.nucleusHandle = []; % Reserves the graphics handle for the cartoon neuron nucleus.
+state.dendriteHandles = []; % Reserves the graphics handles for the branching dendrite lines so the player reads as a neuron rather than a plain ball.
+state.axonHandle = []; % Reserves the graphics handle for the single trailing axon line.
+state.axonBulbHandle = []; % Reserves the graphics handle for the small axon-terminal bouton at the tip of the axon.
 state.trailHandle = []; % Reserves the graphics handle for the fading migration trace.
 state.cueHandles = []; % Reserves the graphics handles for the three molecular cue icons.
 state.cueTextHandles = []; % Reserves the text handles for the three molecular cue labels.
@@ -130,12 +134,16 @@ end % Ends the figure cleanup check.
         elseif strcmp(state.phase,'playing') % Checks whether the same keyboard input should instead control the active neuron.
             if strcmp(key,'uparrow') || strcmp(key,'up') || strcmp(key,'w') % Maps the up arrow (both Octave/MATLAB key-name spellings) and W key to upward migration.
                 state.direction = [0 1]; % Stores an upward one-cell direction so the player can move toward superficial layers.
+                state.facing = state.direction; % Remembers this heading so the neuron's dendrites/axon still point the right way after a future wall stop.
             elseif strcmp(key,'downarrow') || strcmp(key,'down') || strcmp(key,'s') % Maps the down arrow (both spellings) and S key to downward migration.
                 state.direction = [0 -1]; % Stores a downward one-cell direction for backtracking and route planning.
+                state.facing = state.direction; % Remembers this heading so the neuron's dendrites/axon still point the right way after a future wall stop.
             elseif strcmp(key,'leftarrow') || strcmp(key,'left') || strcmp(key,'a') % Maps the left arrow (both spellings) and A key to leftward movement.
                 state.direction = [-1 0]; % Stores a leftward one-cell direction for tangential travel and maze exploration.
+                state.facing = state.direction; % Remembers this heading so the neuron's dendrites/axon still point the right way after a future wall stop.
             elseif strcmp(key,'rightarrow') || strcmp(key,'right') || strcmp(key,'d') % Maps the right arrow (both spellings) and D key to rightward movement.
                 state.direction = [1 0]; % Stores a rightward one-cell direction for tangential travel and maze exploration.
+                state.facing = state.direction; % Remembers this heading so the neuron's dendrites/axon still point the right way after a future wall stop.
             elseif strcmp(key,'space') % Checks whether the player pressed the spacebar during active play.
                 state.paused = ~state.paused; % Toggles pause status so the player can stop the moving maze without losing progress.
                 if state.paused % Checks whether the game has just entered the paused state.
@@ -200,9 +208,11 @@ end % Ends the figure cleanup check.
         if state.mode == 1 % Checks whether the player selected the pyramidal neuron mode.
             state.player = [5 1]; % Starts pyramidal neurons near the ventricular zone, matching their cortical origin.
             state.direction = [0 1]; % Points the initial migration upward so the first natural movement is radial.
+            state.facing = [0 1]; % Keeps the drawn neuron facing the same initial direction as its migration.
         else % Handles the interneuron mode in which cells begin outside the cortical plate.
             state.player = [2 5]; % Starts interneurons in a left-side MGE/CGE-like source region represented by the subpallial strip.
             state.direction = [1 0]; % Points the initial movement rightward to encourage the documented tangential migration phase.
+            state.facing = [1 0]; % Keeps the drawn neuron facing the same initial direction as its migration.
         end % Ends the mode-dependent starting-position logic.
         state.trail = state.player; % Seeds the migration trace with the starting position for a cute visual footprint.
         build_stage(); % Generates the first stage target, maze, and molecular cues.
@@ -359,11 +369,11 @@ end % Ends the figure cleanup check.
         cla(ax); % Clears the previous screen so the menu is visually clean and separate from any prior gameplay graphics.
         axis(ax,[0 31 0 24]); % Restores the full menu coordinate range after any gameplay-specific drawing changes.
         hold(ax,'on'); % Keeps all menu text and decorative shapes in the same axes.
-        text(15.5,22.5,'CORTICAL MAZE: INSIDE-OUT','HorizontalAlignment','center','FontSize',25,'FontWeight','bold','Color',[0.16 0.24 0.42]); % Displays the playful game title prominently at the top.
-        text(15.5,20.9,'A cute maze about corticogenesis, migration, and cortical layering','HorizontalAlignment','center','FontSize',12,'Color',[0.30 0.36 0.48]); % Gives a one-line description so the scientific topic is clear before play begins.
+        text(15.5,22.5,'CORTICAL MAZE: INSIDE-OUT','HorizontalAlignment','center','FontSize',27,'FontWeight','bold','Color',[0.16 0.24 0.42]); % Displays the playful game title prominently at the top, enlarged along with the rest of the menu text.
+        text(15.5,20.9,'A cute maze about corticogenesis, migration, and cortical layering','HorizontalAlignment','center','FontSize',13,'Color',[0.30 0.36 0.48]); % Gives a one-line description so the scientific topic is clear before play begins.
         patch([2 29 29 2],[17.7 17.7 19.4 19.4],[0.90 0.94 1.00],'EdgeColor','none'); % Draws a soft information panel behind the central learning objective.
-        text(15.5,18.55,'CORE IDEA: build the cortex in the inside-out order  VI -> V -> IV -> II/III -> I','HorizontalAlignment','center','FontSize',12,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Places the key developmental sequence at the center of the educational framing.
-        text(15.5,16.0,'Choose your migrating neuron','HorizontalAlignment','center','FontSize',16,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces the two distinct migration modes represented by the game.
+        text(15.5,18.55,'CORE IDEA: build the cortex in the inside-out order  VI -> V -> IV -> II/III -> I','HorizontalAlignment','center','FontSize',13,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Places the key developmental sequence at the center of the educational framing.
+        text(15.5,16.0,'Choose your migrating neuron','HorizontalAlignment','center','FontSize',17,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces the two distinct migration modes represented by the game.
         if state.mode == 1 % Checks whether the pyramidal mode is currently highlighted.
             patch([3 14 14 3],[11.5 11.5 15.0 15.0],[0.82 0.94 0.90],'EdgeColor',[0.24 0.55 0.45],'LineWidth',2); % Draws a green highlight around the pyramidal choice.
         else % Handles the unselected pyramidal mode.
@@ -374,20 +384,21 @@ end % Ends the figure cleanup check.
         else % Handles the unselected interneuron mode.
             patch([17 28 28 17],[11.5 11.5 15.0 15.0],[0.96 0.97 1.00],'EdgeColor',[0.72 0.76 0.84],'LineWidth',1); % Draws a neutral box when the interneuron option is not active.
         end % Ends the interneuron selection styling.
-        text(8.5,14.25,'1  Pyramidal neuron','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',[0.16 0.38 0.32]); % Labels the excitatory neuron mode.
-        text(8.5,13.25,'Radial migration along a glial-like scaffold','HorizontalAlignment','center','FontSize',11,'Color',[0.27 0.40 0.38]); % Explains the main movement style represented by the pyramidal mode.
-        text(8.5,12.35,'Starts near the ventricular zone','HorizontalAlignment','center','FontSize',10,'Color',[0.37 0.45 0.45]); % Links the starting position to the documented cortical progenitor zones.
-        text(22.5,14.25,'2  Interneuron','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',[0.50 0.25 0.46]); % Labels the inhibitory interneuron mode.
-        text(22.5,13.25,'Tangential migration, then radial integration','HorizontalAlignment','center','FontSize',11,'Color',[0.49 0.35 0.45]); % Explains the two-phase migration represented in the game.
-        text(22.5,12.35,'Starts from an MGE/CGE-like side zone','HorizontalAlignment','center','FontSize',10,'Color',[0.56 0.44 0.54]); % Connects the start region to the documented subpallial origin of interneurons.
-        text(15.5,10.55,'Press 1 / 2 or LEFT / RIGHT arrow to choose, then ENTER or SPACE to begin.','HorizontalAlignment','center','FontSize',10,'Color',[0.30 0.34 0.42]); % Documents both selection methods now that arrow keys work on the menu.
-        text(15.5,9.65,'CONTROLS','HorizontalAlignment','center','FontSize',13,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces the control section before the player starts.
-        text(15.5,8.55,'Arrow keys or W A S D = move    SPACE = pause    H = 3-second marker guide    Q/ESC twice = quit','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.38 0.48]); % Gives every gameplay control in one compact line and documents the new quit confirmation.
-        text(15.5,7.45,'Gameplay: reach the correct molecular cue, learn the layer order, and use the maze efficiently.','HorizontalAlignment','center','FontSize',11,'Color',[0.25 0.32 0.44]); % Explains that navigation and biological identification are coupled rather than separate quizzes.
-        text(15.5,6.35,'Correct cues grow your score and unlock the next stage; wrong cues cost a life.','HorizontalAlignment','center','FontSize',10,'Color',[0.40 0.44 0.52]); % Makes the win/lose logic understandable before the first move.
-        text(15.5,4.85,'Adaptive learning: struggling opens extra shortcuts; fast accurate play keeps the maze tighter.','HorizontalAlignment','center','FontSize',10,'Color',[0.34 0.40 0.50]); % Explains how the dynamic maze changes based on the player's performance.
-        text(15.5,2.55,'Press ENTER or SPACE to start','HorizontalAlignment','center','FontSize',17,'FontWeight','bold','Color',[0.24 0.46 0.60]); % Gives a clear action prompt that starts the game.
-        text(15.5,1.25,'Source concepts: inside-out lamination, radial/tangential migration, radial glia, Reelin, and cortical markers.','HorizontalAlignment','center','FontSize',9,'Color',[0.47 0.50 0.58]); % Acknowledges the neuroscience foundations in the supplied coursework material.
+        text(8.5,14.25,'1  Pyramidal neuron','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',[0.16 0.38 0.32]); % Labels the excitatory neuron mode.
+        text(8.5,13.25,'Radial migration along a glial-like scaffold','HorizontalAlignment','center','FontSize',12,'Color',[0.27 0.40 0.38]); % Explains the main movement style represented by the pyramidal mode.
+        text(8.5,12.35,'Starts near the ventricular zone','HorizontalAlignment','center','FontSize',11,'Color',[0.37 0.45 0.45]); % Links the starting position to the documented cortical progenitor zones.
+        text(22.5,14.25,'2  Interneuron','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',[0.50 0.25 0.46]); % Labels the inhibitory interneuron mode.
+        text(22.5,13.25,'Tangential migration, then radial integration','HorizontalAlignment','center','FontSize',12,'Color',[0.49 0.35 0.45]); % Explains the two-phase migration represented in the game.
+        text(22.5,12.35,'Starts from an MGE/CGE-like side zone','HorizontalAlignment','center','FontSize',11,'Color',[0.56 0.44 0.54]); % Connects the start region to the documented subpallial origin of interneurons.
+        text(15.5,10.55,'Press 1 / 2 or LEFT / RIGHT arrow to choose, then ENTER or SPACE to begin.','HorizontalAlignment','center','FontSize',12,'Color',[0.30 0.34 0.42]); % Documents both selection methods now that arrow keys work on the menu.
+        text(15.5,9.65,'CONTROLS','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces the control section before the player starts.
+        text(15.5,8.55,'Arrow keys or W A S D = move    SPACE = pause    H = 3-second marker guide    Q/ESC twice = quit','HorizontalAlignment','center','FontSize',11,'Color',[0.32 0.38 0.48]); % Gives every gameplay control in one compact line and documents the quit confirmation.
+        text(15.5,7.45,'RULES','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces an explicit win/lose rules section so the stakes are clear before the first move.
+        text(15.5,6.35,'Move onto the ball whose marker matches the CURRENT LAYER shown in the HUD.','HorizontalAlignment','center','FontSize',11,'Color',[0.25 0.32 0.44]); % States the core marker-matching objective in plain language.
+        text(15.5,5.25,'Correct marker: + points, advance a layer.   Wrong marker: lose 1 of 3 lives (and points).','HorizontalAlignment','center','FontSize',11,'Color',[0.40 0.44 0.52]); % Makes the reward-versus-penalty consequence of each cue choice explicit.
+        text(15.5,4.15,'3 wrong picks = GAME OVER.   Reach Layer I / MZ with a life left = YOU WIN!','HorizontalAlignment','center','FontSize',11,'FontWeight','bold','Color',[0.55 0.22 0.24]); % Spells out the exact win and lose conditions so picking the wrong marker is understood to be punished.
+        text(15.5,2.55,'Press ENTER or SPACE to start','HorizontalAlignment','center','FontSize',18,'FontWeight','bold','Color',[0.24 0.46 0.60]); % Gives a clear action prompt that starts the game.
+        text(15.5,1.25,'Source concepts: inside-out lamination, radial/tangential migration, radial glia, Reelin, and cortical markers.','HorizontalAlignment','center','FontSize',10,'Color',[0.47 0.50 0.58]); % Acknowledges the neuroscience foundations in the supplied coursework material.
         state.phaseDirty = false; % Marks the menu as current so it is not redrawn unnecessarily until state changes again.
     end % Ends the menu-rendering function.
 
@@ -450,18 +461,33 @@ end % Ends the figure cleanup check.
         for k = 1:3 % Iterates over the three cue choices placed during stage construction.
             cuePalette = [0.97 0.79 0.34; 0.74 0.86 0.96; 0.91 0.77 0.91]; % Gives the three cue positions different pastel colors without making correctness itself a visual giveaway.
             col = cuePalette(k,:); % Selects the pastel color assigned to this cue position rather than to its biological correctness.
-            state.cueHandles(k) = plot(state.cuePos(k,1),state.cuePos(k,2),'o','MarkerSize',16,'MarkerFaceColor',col,'MarkerEdgeColor',[0.30 0.34 0.44],'LineWidth',1.2); % Creates the round cartoon cue icon procedurally with a simple plot marker.
-            textY = state.cuePos(k,2) + 0.58; % Places the cue label just above the icon so it remains readable without hiding the maze route.
-            state.cueTextHandles(k) = text(state.cuePos(k,1),textY,state.cueLabels{k},'HorizontalAlignment','center','FontSize',8,'FontWeight','bold','Color',[0.27 0.32 0.42],'Interpreter','none'); % Writes the candidate molecular or conceptual cue label using plain text so markers like Cux1/2 render reliably.
+            state.cueHandles(k) = plot(state.cuePos(k,1),state.cuePos(k,2),'o','MarkerSize',32,'MarkerFaceColor',col,'MarkerEdgeColor',[0.30 0.34 0.44],'LineWidth',1.2); % Creates the round cartoon cue icon, enlarged so its own name can be written directly on it.
+            state.cueTextHandles(k) = text(state.cuePos(k,1),state.cuePos(k,2),state.cueLabels{k},'HorizontalAlignment','center','VerticalAlignment','middle','FontSize',8,'FontWeight','bold','Color',[0.27 0.32 0.42],'Interpreter','none'); % Writes the candidate molecular or conceptual cue label directly on top of its ball instead of floating above it.
         end % Ends the three-cue drawing loop.
     end % Ends the molecular-cue renderer.
 
-    function create_player_graphics() % Creates the cartoon neuron body, nucleus, and short migration trail that visually follow the player.
+    function pts = neuron_process_points() % Computes the current dendrite-tip and axon-tip coordinates from the player's position and last-facing heading.
+        angleBack = atan2d(-state.facing(2),-state.facing(1)); % Points the dendrite fan opposite the heading, as if receiving input from where the neuron came from.
+        angleFront = atan2d(state.facing(2),state.facing(1)); % Points the single axon toward the heading, as if projecting its signal onward.
+        dendriteAngles = angleBack + [-60 -30 0 30 60]; % Spreads five dendrites in a fan around the back angle for a branching look.
+        dendriteLengths = [0.50 0.62 0.72 0.62 0.50]; % Varies dendrite length slightly so the fan looks organic rather than a perfect symmetric star.
+        pts.dendX = state.player(1) + dendriteLengths .* cosd(dendriteAngles); % Computes each dendrite tip's X coordinate from the soma center.
+        pts.dendY = state.player(2) + dendriteLengths .* sind(dendriteAngles); % Computes each dendrite tip's Y coordinate from the soma center.
+        pts.axonX = state.player(1) + 0.85*cosd(angleFront); % Computes the axon tip's X coordinate, longer than any single dendrite as real axons are.
+        pts.axonY = state.player(2) + 0.85*sind(angleFront); % Computes the axon tip's Y coordinate, longer than any single dendrite as real axons are.
+    end % Ends the neuron-geometry helper shared by graphics creation and per-frame updates.
+
+    function create_player_graphics() % Creates the cartoon neuron body, nucleus, dendrites, axon, and short migration trail that visually follow the player.
         state.trailHandle = plot(state.trail(:,1),state.trail(:,2),'-','Color',[0.72 0.82 0.90],'LineWidth',3); % Draws a soft blue migration trace that represents the recent path rather than a permanent Snake tail.
-        state.playerHandle = plot(state.player(1),state.player(2),'o','MarkerSize',18,'MarkerFaceColor',[1.00 0.62 0.66],'MarkerEdgeColor',[0.35 0.20 0.26],'LineWidth',1.4); % Draws the main neuron body as a large pink cartoon soma.
+        pts = neuron_process_points(); % Computes where the dendrites and axon should currently point given the neuron's last heading.
+        state.dendriteHandles = []; % Clears any stale handles before drawing this stage's fresh dendrite set.
+        for dd = 1:5 % Draws each of the five branching dendrites as a thin line from the soma center.
+            state.dendriteHandles(dd) = line([state.player(1) pts.dendX(dd)],[state.player(2) pts.dendY(dd)],'Color',[0.35 0.20 0.26],'LineWidth',1.6); % Draws one dendrite segment behind where the soma will be plotted.
+        end % Ends the dendrite-drawing loop.
+        state.axonHandle = line([state.player(1) pts.axonX],[state.player(2) pts.axonY],'Color',[0.35 0.20 0.26],'LineWidth',1.8); % Draws the single longer axon trailing in the direction the neuron last moved.
+        state.axonBulbHandle = plot(pts.axonX,pts.axonY,'o','MarkerSize',7,'MarkerFaceColor',[0.35 0.20 0.26],'MarkerEdgeColor','none'); % Adds a small axon-terminal bouton at the tip of the axon.
+        state.playerHandle = plot(state.player(1),state.player(2),'o','MarkerSize',18,'MarkerFaceColor',[1.00 0.62 0.66],'MarkerEdgeColor',[0.35 0.20 0.26],'LineWidth',1.4); % Draws the main neuron body as a large pink cartoon soma on top of the dendrite/axon bases.
         state.nucleusHandle = plot(state.player(1),state.player(2),'o','MarkerSize',8,'MarkerFaceColor',[0.62 0.35 0.65],'MarkerEdgeColor','none'); % Adds a smaller purple nucleus so the player reads as a simple neuron rather than a generic cursor.
-        plot(state.player(1)-0.75,state.player(2)+0.45,'.','MarkerSize',18,'Color',[0.35 0.20 0.26]); % Adds one decorative dendritic dot to the upper-left side of the soma as a tiny cartoon detail.
-        plot(state.player(1)+0.75,state.player(2)+0.35,'.','MarkerSize',18,'Color',[0.35 0.20 0.26]); % Adds a second decorative dendritic dot on the upper-right side to give the character a playful asymmetrical look.
     end % Ends the player-graphics constructor.
 
     function update_dynamic_graphics() % Updates moving elements and lightweight HUD information without redrawing the entire maze each frame.
@@ -472,6 +498,18 @@ end % Ends the figure cleanup check.
         if state.phaseDirty && strcmp(state.phase,'playing') % Checks whether a stage transition requires a complete playfield redraw.
             render_playfield(); % Rebuilds the maze, cues, and player graphics when the static scene changed.
         end % Ends the stage-redraw check.
+        pts = neuron_process_points(); % Recomputes dendrite/axon tip coordinates for the neuron's current position and heading.
+        for dd = 1:numel(state.dendriteHandles) % Repositions every dendrite line so the fan follows the neuron each frame.
+            if ishandle(state.dendriteHandles(dd)) % Checks that this dendrite handle is still valid before updating it.
+                set(state.dendriteHandles(dd),'XData',[state.player(1) pts.dendX(dd)],'YData',[state.player(2) pts.dendY(dd)]); % Moves this dendrite segment to the neuron's new position and heading.
+            end % Ends the per-dendrite validity check.
+        end % Ends the dendrite-update loop.
+        if ~isempty(state.axonHandle) && ishandle(state.axonHandle) % Checks whether the axon line is available for a position update.
+            set(state.axonHandle,'XData',[state.player(1) pts.axonX],'YData',[state.player(2) pts.axonY]); % Moves the axon line to trail from the neuron's new position in its current heading.
+        end % Ends the axon-line update.
+        if ~isempty(state.axonBulbHandle) && ishandle(state.axonBulbHandle) % Checks whether the axon-terminal bouton is available for a position update.
+            set(state.axonBulbHandle,'XData',pts.axonX,'YData',pts.axonY); % Moves the axon terminal to match the updated axon tip.
+        end % Ends the axon-bulb update.
         if ~isempty(state.playerHandle) && ishandle(state.playerHandle) % Checks whether the neuron body graphics are available for a position update.
             set(state.playerHandle,'XData',state.player(1),'YData',state.player(2)); % Moves the pink neuron soma to its new grid cell.
         end % Ends the neuron-body update.
@@ -695,7 +733,7 @@ end % Ends the figure cleanup check.
             set(state.cueHandles(cueToMove),'XData',candidate(1),'YData',candidate(2)); % Moves the visual cue icon to its new cell.
         end % Ends the cue-icon move check.
         if cueToMove <= numel(state.cueTextHandles) && ishandle(state.cueTextHandles(cueToMove)) % Checks whether the cue label text object still exists before moving it.
-            set(state.cueTextHandles(cueToMove),'Position',[candidate(1) candidate(2)+0.58]); % Moves the cue label with its icon so the pairing remains readable.
+            set(state.cueTextHandles(cueToMove),'Position',[candidate(1) candidate(2)]); % Moves the cue label onto its relocated ball so the name stays written directly on the marker.
         end % Ends the cue-label move check.
     end % Ends the replacement-cue helper.
 
