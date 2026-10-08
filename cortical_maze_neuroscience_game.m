@@ -21,7 +21,7 @@ state.phase = 'menu'; % Starts the program on the menu screen instead of immedia
 state.mode = 1; % Selects the default neuron type, with mode 1 representing a pyramidal/glutamatergic neuron.
 state.running = false; % Keeps the movement loop inactive until the player deliberately starts the game.
 state.quit = false; % Stores whether the user has requested that the program terminate.
-state.quitArmUntil = 0; % Tracks the deadline for a confirming second Q/ESC press so one accidental tap cannot instantly end a run.
+state.quitArmUntil = 0; % Tracks the deadline for a confirming second Q press so one accidental tap cannot instantly end a run.
 state.paused = false; % Stores whether gameplay is temporarily paused by the spacebar.
 state.gameOver = false; % Records whether the active run has reached a win or lose condition.
 state.score = 0; % Initializes the cumulative score used to reward efficient movement and correct molecular choices.
@@ -128,7 +128,7 @@ end % Ends the figure cleanup check.
                 state.phaseDirty = true; % Requests a menu refresh so the highlighted choice changes on screen.
             elseif strcmp(key,'return') || strcmp(key,'space') % Checks for the enter or space key as the universal start command.
                 reset_game(); % Initializes a new run using the currently selected neuron type and starts the maze.
-            elseif strcmp(key,'escape') || strcmp(key,'q') % Checks for either escape or q as a quit command.
+            elseif strcmp(key,'q') % Checks for q as the quit command (escape no longer quits; it now means "go to menu", and the menu is already shown here).
                 state.quit = true; % Requests clean termination of the program.
             end % Ends the menu key-choice logic.
         elseif strcmp(state.phase,'playing') % Checks whether the same keyboard input should instead control the active neuron.
@@ -159,22 +159,26 @@ end % Ends the figure cleanup check.
                 state.score = max(0,state.score - 3); % Applies a small score cost to make the help system a deliberate strategic choice.
                 state.message = 'Memory aid used: -3 points.'; % Tells the player why the score changed and frames the tool as assistance rather than punishment.
                 state.messageUntil = toc(state.gameClock) + 1.5; % Shows the feedback briefly so it does not dominate the screen.
-            elseif strcmp(key,'escape') || strcmp(key,'q') % Checks for escape or q during active play.
+            elseif strcmp(key,'escape') % Checks for escape during active play, which now means "go back to the menu" rather than quitting the app.
+                state.phase = 'menu'; % Switches the state machine back to the start screen, abandoning the current run.
+                state.running = false; % Marks the active movement loop as finished for clarity, matching how a completed run is marked.
+                state.phaseDirty = true; % Requests the menu screen to be redrawn.
+            elseif strcmp(key,'q') % Checks for q during active play, the dedicated (and still confirmed) quit-the-whole-game command.
                 if toc(state.gameClock) <= state.quitArmUntil % Checks whether this is the confirming second press within the short arming window.
                     state.quit = true; % Exits the game cleanly now that the player has confirmed the quit.
                 else % Handles the first press, which only arms the quit instead of exiting immediately.
                     state.quitArmUntil = toc(state.gameClock) + 2; % Opens a brief window during which a repeat press confirms the quit.
-                    state.message = 'Press Q or ESC again to quit - any other key cancels.'; % Prevents a single accidental tap next to W/A/S/D from silently ending the run.
+                    state.message = 'Press Q again to quit - ESC returns to menu - any other key cancels.'; % Prevents a single accidental tap next to W/A/S/D from silently ending the run, and documents the new ESC shortcut.
                     state.messageUntil = toc(state.gameClock) + 2; % Keeps the confirmation prompt visible for the same duration as the arming window.
                 end % Ends the quit-confirmation check.
             end % Ends the active gameplay key-choice logic.
         elseif strcmp(state.phase,'end') % Checks whether key input should control the results screen.
             if strcmp(key,'r') || strcmp(key,'return') || strcmp(key,'space') % Allows any of three intuitive keys to restart immediately.
                 reset_game(); % Begins a fresh run using the same selected neuron mode.
-            elseif strcmp(key,'m') % Allows the player to return to the neuron-selection menu.
+            elseif strcmp(key,'m') || strcmp(key,'escape') % Allows the player to return to the neuron-selection menu; escape is now a synonym for M everywhere instead of quitting.
                 state.phase = 'menu'; % Switches the state machine back to the start screen.
                 state.phaseDirty = true; % Requests the menu screen to be redrawn.
-            elseif strcmp(key,'escape') || strcmp(key,'q') % Accepts the same quit controls used during play.
+            elseif strcmp(key,'q') % Accepts q as the results-screen quit control.
                 state.quit = true; % Requests clean termination of the game.
             end % Ends the results-screen key-choice logic.
         end % Ends the phase-dependent keyboard handler.
@@ -369,38 +373,43 @@ end % Ends the figure cleanup check.
         cla(ax); % Clears the previous screen so the menu is visually clean and separate from any prior gameplay graphics.
         axis(ax,[0 31 0 24]); % Restores the full menu coordinate range after any gameplay-specific drawing changes.
         hold(ax,'on'); % Keeps all menu text and decorative shapes in the same axes.
-        text(15.5,22.5,'CORTICAL MAZE: INSIDE-OUT','HorizontalAlignment','center','FontSize',27,'FontWeight','bold','Color',[0.16 0.24 0.42]); % Displays the playful game title prominently at the top, enlarged along with the rest of the menu text.
-        text(15.5,20.9,'A cute maze about corticogenesis, migration, and cortical layering','HorizontalAlignment','center','FontSize',13,'Color',[0.30 0.36 0.48]); % Gives a one-line description so the scientific topic is clear before play begins.
-        patch([2 29 29 2],[17.5 17.5 19.9 19.9],[0.90 0.94 1.00],'EdgeColor',[0.70 0.78 0.92],'LineWidth',1); % Draws a larger, bordered information panel behind the central learning objective so it reads as the screen's visual anchor.
-        text(15.5,19.15,'CORE IDEA','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Labels the panel on its own line so the sequence below has room to be large without overflowing.
-        text(15.5,18.15,'Build the cortex inside-out:   VI -> V -> IV -> II/III -> I','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Places the key developmental sequence front and center, enlarged so it is the first rule a player absorbs, now short enough to fit on one line.
-        text(15.5,16.0,'Choose your migrating neuron','HorizontalAlignment','center','FontSize',17,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces the two distinct migration modes represented by the game.
+        inkColor = [0.16 0.24 0.42]; % Defines the single "ink" color used for every heading and emphasized label on the menu.
+        inkMutedColor = [0.45 0.50 0.60]; % Defines a lighter tint of the same ink color for secondary/descriptive text, keeping the palette to one hue family instead of adding a second text color.
+        accentColor = [0.16 0.48 0.52]; % Defines the single accent color used for anything selected, actionable, or emphasized (selected card, win condition, start prompt).
+        accentLightColor = [0.84 0.94 0.93]; % Defines a light tint of the accent color for the selected card's fill, keeping it in the same hue family as the accent itself.
+        neutralFillColor = [0.94 0.95 0.97]; % Defines the single neutral background tint shared by both info panels and any unselected card.
+        neutralBorderColor = [0.78 0.81 0.88]; % Defines a darker shade of the same neutral tone for panel/card borders, so the whole menu stays within three base colors (ink, accent, neutral).
+        text(15.5,22.5,'CORTICAL MAZE: INSIDE-OUT','FontName','Arial','HorizontalAlignment','center','FontSize',27,'FontWeight','bold','Color',inkColor); % Displays the playful game title prominently at the top, enlarged along with the rest of the menu text.
+        text(15.5,20.9,'A cute maze about corticogenesis, migration, and cortical layering','FontName','Arial','HorizontalAlignment','center','FontSize',13,'Color',inkMutedColor); % Gives a one-line description so the scientific topic is clear before play begins.
+        patch([2 29 29 2],[17.5 17.5 19.9 19.9],neutralFillColor,'EdgeColor',neutralBorderColor,'LineWidth',1); % Draws a larger, bordered information panel behind the central learning objective so it reads as the screen's visual anchor.
+        text(15.5,19.15,'CORE IDEA','FontName','Arial','HorizontalAlignment','center','FontSize',14,'FontWeight','bold','Color',inkColor); % Labels the panel on its own line so the sequence below has room to be large without overflowing.
+        text(15.5,18.15,'Build the cortex inside-out:   VI -> V -> IV -> II/III -> I','FontName','Arial','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',inkColor); % Places the key developmental sequence front and center, enlarged so it is the first rule a player absorbs, now short enough to fit on one line.
+        text(15.5,16.0,'Choose your migrating neuron','FontName','Arial','HorizontalAlignment','center','FontSize',17,'FontWeight','bold','Color',inkColor); % Introduces the two distinct migration modes represented by the game.
         if state.mode == 1 % Checks whether the pyramidal mode is currently highlighted.
-            patch([3 14 14 3],[11.5 11.5 15.0 15.0],[0.82 0.94 0.90],'EdgeColor',[0.24 0.55 0.45],'LineWidth',2); % Draws a green highlight around the pyramidal choice.
+            patch([3 14 14 3],[11.5 11.5 15.0 15.0],accentLightColor,'EdgeColor',accentColor,'LineWidth',2); % Highlights the pyramidal choice using the single shared accent color instead of a mode-specific hue.
         else % Handles the unselected pyramidal mode.
-            patch([3 14 14 3],[11.5 11.5 15.0 15.0],[0.96 0.97 1.00],'EdgeColor',[0.72 0.76 0.84],'LineWidth',1); % Draws a neutral box when the pyramidal option is not active.
+            patch([3 14 14 3],[11.5 11.5 15.0 15.0],neutralFillColor,'EdgeColor',neutralBorderColor,'LineWidth',1); % Draws a neutral box when the pyramidal option is not active.
         end % Ends the pyramidal selection styling.
         if state.mode == 2 % Checks whether the interneuron mode is currently highlighted.
-            patch([17 28 28 17],[11.5 11.5 15.0 15.0],[0.97 0.90 0.95],'EdgeColor',[0.63 0.36 0.56],'LineWidth',2); % Draws a purple highlight around the interneuron choice.
+            patch([17 28 28 17],[11.5 11.5 15.0 15.0],accentLightColor,'EdgeColor',accentColor,'LineWidth',2); % Highlights the interneuron choice using the same shared accent color so selection state is the only thing color communicates.
         else % Handles the unselected interneuron mode.
-            patch([17 28 28 17],[11.5 11.5 15.0 15.0],[0.96 0.97 1.00],'EdgeColor',[0.72 0.76 0.84],'LineWidth',1); % Draws a neutral box when the interneuron option is not active.
+            patch([17 28 28 17],[11.5 11.5 15.0 15.0],neutralFillColor,'EdgeColor',neutralBorderColor,'LineWidth',1); % Draws a neutral box when the interneuron option is not active.
         end % Ends the interneuron selection styling.
-        text(8.5,14.25,'1  Pyramidal neuron','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',[0.16 0.38 0.32]); % Labels the excitatory neuron mode.
-        text(8.5,13.25,'Radial migration along a glial-like scaffold','HorizontalAlignment','center','FontSize',12,'Color',[0.27 0.40 0.38]); % Explains the main movement style represented by the pyramidal mode.
-        text(8.5,12.35,'Starts near the ventricular zone','HorizontalAlignment','center','FontSize',11,'Color',[0.37 0.45 0.45]); % Links the starting position to the documented cortical progenitor zones.
-        text(22.5,14.25,'2  Interneuron','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',[0.50 0.25 0.46]); % Labels the inhibitory interneuron mode.
-        text(22.5,13.25,'Tangential migration, then radial integration','HorizontalAlignment','center','FontSize',12,'Color',[0.49 0.35 0.45]); % Explains the two-phase migration represented in the game.
-        text(22.5,12.35,'Starts from an MGE/CGE-like side zone','HorizontalAlignment','center','FontSize',11,'Color',[0.56 0.44 0.54]); % Connects the start region to the documented subpallial origin of interneurons.
-        text(15.5,10.5,'Press 1 / 2 or LEFT / RIGHT arrow to choose, then ENTER or SPACE to begin.','HorizontalAlignment','center','FontSize',11,'Color',[0.30 0.34 0.42]); % Documents both selection methods now that arrow keys work on the menu, kept small as secondary guidance beneath the two cards.
-        text(15.5,9.55,'CONTROLS:  Arrow keys or WASD = move   SPACE = pause   H = marker guide   Q/ESC twice = quit','HorizontalAlignment','center','FontSize',10,'Color',[0.40 0.44 0.52]); % Compresses the control reference into one small, de-emphasized line so it no longer competes visually with the rules.
-        patch([2 29 29 2],[2.75 2.75 8.0 8.0],[0.99 0.93 0.90],'EdgeColor',[0.80 0.62 0.58],'LineWidth',1); % Gives the rules their own centered, bordered panel as wide as the core idea panel so they read as clearly as it does.
-        text(15.5,7.45,'RULES','HorizontalAlignment','center','FontSize',16,'FontWeight','bold','Color',[0.20 0.26 0.38]); % Introduces an explicit win/lose rules section, enlarged to match the core idea's visual weight.
-        text(15.5,6.4,'Move onto the ball whose marker matches the CURRENT LAYER shown in the HUD.','HorizontalAlignment','center','FontSize',13,'Color',[0.25 0.32 0.44]); % States the core marker-matching objective in plain language.
-        text(15.5,5.4,'Correct marker: + points, advance a layer.','HorizontalAlignment','center','FontSize',13,'Color',[0.40 0.44 0.52]); % States the reward for a correct choice on its own short line so it never needs to shrink to fit.
-        text(15.5,4.4,'Wrong marker: lose 1 of 3 lives (and points). 3 wrong picks = GAME OVER.','HorizontalAlignment','center','FontSize',13,'Color',[0.40 0.44 0.52]); % States the penalty and the exact loss condition together, still short enough to fit on one line at this size.
-        text(15.5,3.4,'Reach Layer I / MZ with a life left = YOU WIN!','HorizontalAlignment','center','FontSize',13,'FontWeight','bold','Color',[0.55 0.22 0.24]); % Spells out the win condition on its own emphasized line so it is unmissable.
-        text(15.5,1.85,'Press ENTER or SPACE to start','HorizontalAlignment','center','FontSize',18,'FontWeight','bold','Color',[0.24 0.46 0.60]); % Gives a clear action prompt that starts the game.
-        text(15.5,0.75,'Source concepts: inside-out lamination, radial/tangential migration, radial glia, Reelin, and cortical markers.','HorizontalAlignment','center','FontSize',9,'Color',[0.47 0.50 0.58]); % Acknowledges the neuroscience foundations in the supplied coursework material, kept small as a footer credit.
+        text(8.5,14.25,'1  Pyramidal neuron','FontName','Arial','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',inkColor); % Labels the excitatory neuron mode.
+        text(8.5,13.25,'Radial migration along a glial-like scaffold','FontName','Arial','HorizontalAlignment','center','FontSize',12,'Color',inkMutedColor); % Explains the main movement style represented by the pyramidal mode.
+        text(8.5,12.35,'Starts near the ventricular zone','FontName','Arial','HorizontalAlignment','center','FontSize',11,'Color',inkMutedColor); % Links the starting position to the documented cortical progenitor zones.
+        text(22.5,14.25,'2  Interneuron','FontName','Arial','HorizontalAlignment','center','FontSize',15,'FontWeight','bold','Color',inkColor); % Labels the inhibitory interneuron mode.
+        text(22.5,13.25,'Tangential migration, then radial integration','FontName','Arial','HorizontalAlignment','center','FontSize',12,'Color',inkMutedColor); % Explains the two-phase migration represented in the game.
+        text(22.5,12.35,'Starts from an MGE/CGE-like side zone','FontName','Arial','HorizontalAlignment','center','FontSize',11,'Color',inkMutedColor); % Connects the start region to the documented subpallial origin of interneurons.
+        text(15.5,10.5,'Press 1 / 2 or LEFT / RIGHT arrow to choose, then ENTER or SPACE to begin.','FontName','Arial','HorizontalAlignment','center','FontSize',11,'Color',inkMutedColor); % Documents both selection methods now that arrow keys work on the menu, kept small as secondary guidance beneath the two cards.
+        text(15.5,9.55,'CONTROLS:  Arrow keys or WASD = move   SPACE = pause   H = marker guide   Q twice = quit   ESC = menu','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',inkMutedColor); % Compresses the control reference into one small, de-emphasized line so it no longer competes visually with the rules, and documents the new ESC-to-menu shortcut.
+        patch([2 29 29 2],[2.75 2.75 8.0 8.0],neutralFillColor,'EdgeColor',neutralBorderColor,'LineWidth',1); % Gives the rules their own centered panel matching the core idea panel exactly, so the two read as a consistent pair.
+        text(15.5,7.45,'RULES','FontName','Arial','HorizontalAlignment','center','FontSize',16,'FontWeight','bold','Color',inkColor); % Introduces an explicit win/lose rules section, enlarged to match the core idea's visual weight.
+        text(15.5,6.4,'Move onto the ball whose marker matches the CURRENT LAYER shown in the HUD.','FontName','Arial','HorizontalAlignment','center','FontSize',13,'Color',inkMutedColor); % States the core marker-matching objective in plain language.
+        text(15.5,5.4,'Correct marker: + points, advance a layer.','FontName','Arial','HorizontalAlignment','center','FontSize',13,'Color',inkMutedColor); % States the reward for a correct choice on its own short line so it never needs to shrink to fit.
+        text(15.5,4.4,'Wrong marker: lose 1 of 3 lives (and points). 3 wrong picks = GAME OVER.','FontName','Arial','HorizontalAlignment','center','FontSize',13,'Color',inkMutedColor); % States the penalty and the exact loss condition together, still short enough to fit on one line at this size.
+        text(15.5,3.4,'Reach Layer I / MZ with a life left = YOU WIN!','FontName','Arial','HorizontalAlignment','center','FontSize',13,'FontWeight','bold','Color',accentColor); % Spells out the win condition on its own emphasized line, using the accent color so it is unmissable without introducing a fourth color.
+        text(15.5,1.85,'Press ENTER or SPACE to start','FontName','Arial','HorizontalAlignment','center','FontSize',18,'FontWeight','bold','Color',accentColor); % Gives a clear action prompt that starts the game, in the same accent color as the win condition and selected cards.
         state.phaseDirty = false; % Marks the menu as current so it is not redrawn unnecessarily until state changes again.
     end % Ends the menu-rendering function.
 
@@ -414,10 +423,10 @@ end % Ends the figure cleanup check.
         draw_maze_walls(); % Draws every carved maze boundary as a soft cartoon-like line.
         if state.mode == 2 % Checks whether the player selected the interneuron mode.
             patch([0.5 4.5 4.5 0.5],[1.0 1.0 9.5 9.5],[0.93 0.87 0.96],'EdgeColor',[0.67 0.52 0.68],'LineWidth',1.2); % Tints the left strip to visually represent the MGE/CGE-like subpallial source region.
-            text(2.5,8.8,'MGE/CGE','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.49 0.34 0.51]); % Labels the source region so the tangential route has an anatomical anchor.
+            text(2.5,8.8,'MGE/CGE','FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.49 0.34 0.51]); % Labels the source region so the tangential route has an anatomical anchor.
         end % Ends the interneuron source-zone drawing.
-        text(27.4,22.6,inside_out_text(),'HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Shows the developmental order at the top right as a compact navigation memory cue.
-        text(3.7,20.8,'radial glia-like scaffold','HorizontalAlignment','center','FontSize',9,'Color',[0.34 0.50 0.58]); % Reminds the player that radial migration follows a scaffold represented by the grid pathways.
+        text(27.4,22.6,inside_out_text(),'FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Shows the developmental order at the top right as a compact navigation memory cue.
+        text(3.7,20.8,'radial glia-like scaffold','FontName','Arial','HorizontalAlignment','center','FontSize',9,'Color',[0.34 0.50 0.58]); % Reminds the player that radial migration follows a scaffold represented by the grid pathways.
         draw_cues(); % Creates the three molecular-cue icons and their labels for the current stage.
         create_player_graphics(); % Creates the neuron body, nucleus, and migration trace graphics at the current location.
         update_hud(); % Draws the score, stage, lives, timer, and contextual message in the top HUD area.
@@ -433,7 +442,7 @@ end % Ends the figure cleanup check.
             y1 = bands(b,1)-0.5; % Converts the first maze row of a band to the outer edge of its background rectangle.
             y2 = bands(b,2)+0.5; % Converts the last maze row of a band to the outer edge of its background rectangle.
             patch([0.5 26.5 26.5 0.5],[y1 y1 y2 y2],bands(b,3:5),'EdgeColor','none'); % Draws the full-width pastel rectangle that visually encodes cortical depth.
-            text(28.1,yMid(b),labels{b},'HorizontalAlignment','center','FontSize',9,'FontWeight','bold','Color',[0.33 0.38 0.48]); % Writes the compartment label at the far right so it never blocks the maze.
+            text(28.1,yMid(b),labels{b},'FontName','Arial','HorizontalAlignment','center','FontSize',9,'FontWeight','bold','Color',[0.33 0.38 0.48]); % Writes the compartment label at the far right so it never blocks the maze.
         end % Ends the cortical-band drawing loop.
         line([0.5 26.5],[2.5 2.5],'Color',[0.73 0.68 0.60],'LineWidth',1.0); % Separates the transient subplate from the deeper Layer VI band with a soft boundary line.
         line([0.5 26.5],[18.5 18.5],'Color',[0.72 0.66 0.60],'LineWidth',1.2); % Closes the top edge of the Layer I/marginal-zone region for a neat cortical silhouette.
@@ -455,7 +464,7 @@ end % Ends the figure cleanup check.
             end % Ends the column loop for horizontal walls.
         end % Ends the row loop for horizontal walls.
         if state.shortcutCount > 1 % Checks whether adaptive assistance has opened more than one shortcut.
-            text(14,20.8,sprintf('plasticity shortcuts: %d',state.shortcutCount),'HorizontalAlignment','center','FontSize',8,'Color',[0.37 0.48 0.55]); % Makes the adaptive-path mechanic visible without requiring a separate tutorial panel.
+            text(14,20.8,sprintf('plasticity shortcuts: %d',state.shortcutCount),'FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.37 0.48 0.55]); % Makes the adaptive-path mechanic visible without requiring a separate tutorial panel.
         end % Ends the shortcut label check.
     end % Ends the maze-wall renderer.
 
@@ -463,8 +472,8 @@ end % Ends the figure cleanup check.
         for k = 1:3 % Iterates over the three cue choices placed during stage construction.
             cuePalette = [0.97 0.79 0.34; 0.74 0.86 0.96; 0.91 0.77 0.91]; % Gives the three cue positions different pastel colors without making correctness itself a visual giveaway.
             col = cuePalette(k,:); % Selects the pastel color assigned to this cue position rather than to its biological correctness.
-            state.cueHandles(k) = plot(state.cuePos(k,1),state.cuePos(k,2),'o','MarkerSize',32,'MarkerFaceColor',col,'MarkerEdgeColor',[0.30 0.34 0.44],'LineWidth',1.2); % Creates the round cartoon cue icon, enlarged so its own name can be written directly on it.
-            state.cueTextHandles(k) = text(state.cuePos(k,1),state.cuePos(k,2),state.cueLabels{k},'HorizontalAlignment','center','VerticalAlignment','middle','FontSize',8,'FontWeight','bold','Color',[0.27 0.32 0.42],'Interpreter','none'); % Writes the candidate molecular or conceptual cue label directly on top of its ball instead of floating above it.
+            state.cueHandles(k) = plot(state.cuePos(k,1),state.cuePos(k,2),'o','MarkerSize',22,'MarkerFaceColor',col,'MarkerEdgeColor',[0.30 0.34 0.44],'LineWidth',1.2); % Creates the round cartoon cue icon, sized to carry its own name without dominating the maze cell.
+            state.cueTextHandles(k) = text(state.cuePos(k,1),state.cuePos(k,2),state.cueLabels{k},'FontName','Arial','HorizontalAlignment','center','VerticalAlignment','middle','FontSize',7,'FontWeight','bold','Color',[0.27 0.32 0.42],'Interpreter','none'); % Writes the candidate molecular or conceptual cue label directly on top of its ball instead of floating above it.
         end % Ends the three-cue drawing loop.
     end % Ends the molecular-cue renderer.
 
@@ -548,13 +557,13 @@ end % Ends the figure cleanup check.
             if state.mode == 2 % Checks whether the player selected the interneuron mode.
                 modeName = 'Interneuron / tangential -> radial'; % Uses a compact summary of the two migration phases.
             end % Ends the mode-name selection for first-time HUD construction.
-            state.hudHandles(1) = text(7.0,22.55,sprintf('Score: %d',state.score),'HorizontalAlignment','left','FontSize',11,'FontWeight','bold','Color',[0.23 0.31 0.44]); % Creates the score label in the top-left HUD area.
-            state.hudHandles(2) = text(7.0,21.75,sprintf('Lives: %d',state.lives),'HorizontalAlignment','left','FontSize',10,'Color',[0.40 0.31 0.40]); % Creates the lives label directly beneath the score.
-            state.hudHandles(3) = text(12.0,22.55,sprintf('Time: %4.1f s',totalTime),'HorizontalAlignment','left','FontSize',10,'Color',[0.30 0.37 0.47]); % Creates the timer label in the center-left HUD area.
-            state.hudHandles(4) = text(12.0,21.75,sprintf('Stage %d/%d: %s',state.stage,total_stages(),state.targetInfo.layer),'HorizontalAlignment','left','FontSize',10,'FontWeight','bold','Color',[0.30 0.37 0.47]); % Creates the developmental-stage label used throughout play.
-            state.hudHandles(5) = text(20.0,22.55,modeName,'HorizontalAlignment','left','FontSize',9,'Color',[0.40 0.45 0.54]); % Creates the migration-mode label that keeps the behavioral rule visible without interrupting play.
-            state.hudHandles(6) = text(20.0,21.75,'H = memory guide','HorizontalAlignment','left','FontSize',9,'Color',[0.42 0.45 0.52]); % Reminds the player that help is available but deliberately optional.
-            state.hudHandles(7) = text(3.5,20.55,'','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.26 0.35 0.49]); % Creates an empty message slot directly above the maze where temporary feedback can appear.
+            state.hudHandles(1) = text(7.0,22.55,sprintf('Score: %d',state.score),'FontName','Arial','HorizontalAlignment','left','FontSize',11,'FontWeight','bold','Color',[0.23 0.31 0.44]); % Creates the score label in the top-left HUD area.
+            state.hudHandles(2) = text(7.0,21.75,sprintf('Lives: %d',state.lives),'FontName','Arial','HorizontalAlignment','left','FontSize',10,'Color',[0.40 0.31 0.40]); % Creates the lives label directly beneath the score.
+            state.hudHandles(3) = text(12.0,22.55,sprintf('Time: %4.1f s',totalTime),'FontName','Arial','HorizontalAlignment','left','FontSize',10,'Color',[0.30 0.37 0.47]); % Creates the timer label in the center-left HUD area.
+            state.hudHandles(4) = text(12.0,21.75,sprintf('Stage %d/%d: %s',state.stage,total_stages(),state.targetInfo.layer),'FontName','Arial','HorizontalAlignment','left','FontSize',10,'FontWeight','bold','Color',[0.30 0.37 0.47]); % Creates the developmental-stage label used throughout play.
+            state.hudHandles(5) = text(20.0,22.55,modeName,'FontName','Arial','HorizontalAlignment','left','FontSize',9,'Color',[0.40 0.45 0.54]); % Creates the migration-mode label that keeps the behavioral rule visible without interrupting play.
+            state.hudHandles(6) = text(20.0,21.75,'H = memory guide','FontName','Arial','HorizontalAlignment','left','FontSize',9,'Color',[0.42 0.45 0.52]); % Reminds the player that help is available but deliberately optional.
+            state.hudHandles(7) = text(3.5,20.55,'','FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.26 0.35 0.49]); % Creates an empty message slot directly above the maze where temporary feedback can appear.
         end % Ends the HUD-creation check.
         if ~isempty(state.hudHandles) && all(arrayfun(@(h) ishandle(h),state.hudHandles)) % Checks that all HUD objects exist before applying the latest text values.
             set(state.hudHandles(4),'String',sprintf('Stage %d/%d: %s',state.stage,total_stages(),state.targetInfo.layer)); % Refreshes the stage number and current layer label after every movement.
@@ -585,14 +594,14 @@ end % Ends the figure cleanup check.
     function render_guide() % Draws a compact three-second field guide that supports memory retrieval without permanently revealing every answer.
         clear_guide(); % Clears any previous version so the guide can be redrawn cleanly after a new H press.
         state.helpHandles(1) = patch([2.0 11.0 11.0 2.0],[3.0 3.0 18.0 18.0],[0.99 0.98 0.92],'EdgeColor',[0.76 0.66 0.40],'LineWidth',1.2); % Stores the memory-card background so it can be deleted cleanly when the three-second aid expires.
-        state.helpHandles(2) = text(6.5,17.2,'MEMORY GUIDE','HorizontalAlignment','center','FontSize',12,'FontWeight','bold','Color',[0.39 0.33 0.20]); % Stores the guide title as a temporary graphics handle.
-        state.helpHandles(3) = text(6.5,15.7,'VI  ->  Tbr1','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer VI mapping derived from the supplied source.
-        state.helpHandles(4) = text(6.5,14.3,'V   ->  Ctip2','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer V mapping from the supplied source.
-        state.helpHandles(5) = text(6.5,12.9,'IV  ->  Rorb','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer IV mapping from the supplied source.
-        state.helpHandles(6) = text(6.5,11.5,'II/III -> Cux1/2','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the upper-layer mapping from the supplied source.
-        state.helpHandles(7) = text(6.5,10.1,'I/MZ -> Reelin','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the marginal-zone Reelin mapping from the supplied source.
-        state.helpHandles(8) = text(6.5,7.6,'Press H again to refresh','HorizontalAlignment','center','FontSize',8,'Color',[0.46 0.42 0.34]); % Stores the reminder that the memory support is temporary.
-        state.helpHandles(9) = text(6.5,6.5,'Guide use costs 3 points','HorizontalAlignment','center','FontSize',8,'Color',[0.55 0.45 0.32]); % Stores the reminder that externalizing the memory has a small strategic cost.
+        state.helpHandles(2) = text(6.5,17.2,'MEMORY GUIDE','FontName','Arial','HorizontalAlignment','center','FontSize',12,'FontWeight','bold','Color',[0.39 0.33 0.20]); % Stores the guide title as a temporary graphics handle.
+        state.helpHandles(3) = text(6.5,15.7,'VI  ->  Tbr1','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer VI mapping derived from the supplied source.
+        state.helpHandles(4) = text(6.5,14.3,'V   ->  Ctip2','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer V mapping from the supplied source.
+        state.helpHandles(5) = text(6.5,12.9,'IV  ->  Rorb','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer IV mapping from the supplied source.
+        state.helpHandles(6) = text(6.5,11.5,'II/III -> Cux1/2','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the upper-layer mapping from the supplied source.
+        state.helpHandles(7) = text(6.5,10.1,'I/MZ -> Reelin','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the marginal-zone Reelin mapping from the supplied source.
+        state.helpHandles(8) = text(6.5,7.6,'Press H again to refresh','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.46 0.42 0.34]); % Stores the reminder that the memory support is temporary.
+        state.helpHandles(9) = text(6.5,6.5,'Guide use costs 3 points','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.55 0.45 0.32]); % Stores the reminder that externalizing the memory has a small strategic cost.
     end % Ends the field-guide renderer.
 
     function clear_guide() % Deletes the temporary field-guide text and panel so the maze becomes the main focus again.
@@ -772,19 +781,19 @@ end % Ends the figure cleanup check.
         won = state.lives > 0 && state.stage >= total_stages(); % Determines whether the final state satisfies the game's win condition.
         if won % Checks whether the player successfully completed the entire developmental sequence.
             patch([5 26 26 5],[13 13 20.5 20.5],[0.85 0.95 0.90],'EdgeColor',[0.35 0.60 0.48],'LineWidth',2); % Draws a soft green victory panel behind the congratulations message.
-            text(15.5,18.2,'CORTICAL LAMINATION COMPLETE!','HorizontalAlignment','center','FontSize',20,'FontWeight','bold','Color',[0.20 0.48 0.35]); % Announces successful completion using the game's biological metaphor.
-            text(15.5,16.7,'Your neuron reached the correct developmental sequence and stopped at the marginal zone.','HorizontalAlignment','center','FontSize',11,'Color',[0.28 0.40 0.34]); % Explains the final outcome in terms of the represented migration process.
+            text(15.5,18.2,'CORTICAL LAMINATION COMPLETE!','FontName','Arial','HorizontalAlignment','center','FontSize',20,'FontWeight','bold','Color',[0.20 0.48 0.35]); % Announces successful completion using the game's biological metaphor.
+            text(15.5,16.7,'Your neuron reached the correct developmental sequence and stopped at the marginal zone.','FontName','Arial','HorizontalAlignment','center','FontSize',11,'Color',[0.28 0.40 0.34]); % Explains the final outcome in terms of the represented migration process.
         else % Handles the lose condition when the player selected too many incorrect cues.
             patch([5 26 26 5],[13 13 20.5 20.5],[0.98 0.90 0.92],'EdgeColor',[0.67 0.43 0.48],'LineWidth',2); % Draws a soft rose panel behind the corrective result message.
-            text(15.5,18.2,'MIGRATION PAUSED','HorizontalAlignment','center','FontSize',20,'FontWeight','bold','Color',[0.60 0.27 0.34]); % Announces that the neuron failed the current developmental run without framing the mistake as permanent.
-            text(15.5,16.7,'Try again and use the molecular-marker relationships to make each stage easier.','HorizontalAlignment','center','FontSize',11,'Color',[0.48 0.35 0.39]); % Frames the loss as an opportunity for another learning attempt.
+            text(15.5,18.2,'MIGRATION PAUSED','FontName','Arial','HorizontalAlignment','center','FontSize',20,'FontWeight','bold','Color',[0.60 0.27 0.34]); % Announces that the neuron failed the current developmental run without framing the mistake as permanent.
+            text(15.5,16.7,'Try again and use the molecular-marker relationships to make each stage easier.','FontName','Arial','HorizontalAlignment','center','FontSize',11,'Color',[0.48 0.35 0.39]); % Frames the loss as an opportunity for another learning attempt.
         end % Ends the win-versus-loss visual branch.
-        text(15.5,11.5,sprintf('Score: %d',state.score),'HorizontalAlignment','center','FontSize',16,'FontWeight','bold','Color',[0.25 0.31 0.42]); % Reports the final score prominently.
-        text(15.5,10.1,sprintf('Time: %4.1f s    Moves: %d    Wall bumps: %d',totalTime,state.moves,state.wallBumps),'HorizontalAlignment','center','FontSize',10,'Color',[0.36 0.40 0.50]); % Reports navigation efficiency and route-planning statistics.
-        text(15.5,8.8,sprintf('Wrong cues: %d    Best correct streak: %d',state.wrongCues,state.bestStreak),'HorizontalAlignment','center','FontSize',10,'Color',[0.36 0.40 0.50]); % Reports conceptual accuracy and reinforcement-style streak performance.
-        text(15.5,6.4,'What the mechanics taught: deep layers first, then outward; migration style changes by neuron type; Reelin ends radial migration.','HorizontalAlignment','center','FontSize',10,'Color',[0.30 0.36 0.47]); % Summarizes the conceptual lessons without turning the entire game into a lecture.
-        text(15.5,4.25,'R / ENTER / SPACE = restart     M = menu     Q / ESC = quit','HorizontalAlignment','center','FontSize',12,'FontWeight','bold','Color',[0.24 0.43 0.57]); % Gives clear next-step controls so the game never leaves the player at a dead end.
-        text(15.5,2.35,'The maze was procedurally generated from simple grid walls, shapes, and text only.','HorizontalAlignment','center','FontSize',9,'Color',[0.49 0.52 0.58]); % Confirms the procedural-graphics requirement in the final presentation screen.
+        text(15.5,11.5,sprintf('Score: %d',state.score),'FontName','Arial','HorizontalAlignment','center','FontSize',16,'FontWeight','bold','Color',[0.25 0.31 0.42]); % Reports the final score prominently.
+        text(15.5,10.1,sprintf('Time: %4.1f s    Moves: %d    Wall bumps: %d',totalTime,state.moves,state.wallBumps),'FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.36 0.40 0.50]); % Reports navigation efficiency and route-planning statistics.
+        text(15.5,8.8,sprintf('Wrong cues: %d    Best correct streak: %d',state.wrongCues,state.bestStreak),'FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.36 0.40 0.50]); % Reports conceptual accuracy and reinforcement-style streak performance.
+        text(15.5,6.4,'What the mechanics taught: deep layers first, then outward; migration style changes by neuron type; Reelin ends radial migration.','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.30 0.36 0.47]); % Summarizes the conceptual lessons without turning the entire game into a lecture.
+        text(15.5,4.25,'R / ENTER / SPACE = restart     M / ESC = menu     Q = quit','FontName','Arial','HorizontalAlignment','center','FontSize',12,'FontWeight','bold','Color',[0.24 0.43 0.57]); % Gives clear next-step controls so the game never leaves the player at a dead end.
+        text(15.5,2.35,'The maze was procedurally generated from simple grid walls, shapes, and text only.','FontName','Arial','HorizontalAlignment','center','FontSize',9,'Color',[0.49 0.52 0.58]); % Confirms the procedural-graphics requirement in the final presentation screen.
         state.phaseDirty = false; % Marks the results screen as rendered so it does not redraw every frame.
     end % Ends the final result-screen renderer.
 end % Ends the main cortical-maze game function.
