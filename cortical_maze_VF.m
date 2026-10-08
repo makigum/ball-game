@@ -592,7 +592,7 @@ end              % Ends the figure cleanup check.
         end                % Ends the interneuron source-zone drawing.
         draw_maze_walls(); % Draws every carved maze boundary as a soft cartoon-like line, now on top of every background tint so the labyrinth is always visible.
         text(27.4,22.6,inside_out_text(),'FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Shows the developmental order at the top right as a compact navigation memory cue.
-        text(3.7,20.8,'radial glia-like scaffold','FontName','Arial','HorizontalAlignment','center','FontSize',9,'Color',[0.34 0.50 0.58]);             % Reminds the player that radial migration follows a scaffold represented by the grid pathways.
+        text(20.0,20.15,'radial glia-like scaffold','FontName','Arial','HorizontalAlignment','left','FontSize',9,'Color',[0.34 0.50 0.58]); % Reminds the player that radial migration follows a scaffold represented by the grid pathways. Moved into the right-side info column (below modeName/H-guide) so it never overlaps the feedback-message slot on the left.
         draw_cues();              % Creates the three molecular-cue icons and their labels for the current stage.
         create_player_graphics(); % Creates the neuron body, nucleus, and migration trace graphics at the current location.
         update_hud();             % Draws the score, stage, lives, timer, and contextual message in the top HUD area.
@@ -895,6 +895,8 @@ end              % Ends the figure cleanup check.
             state.stage = state.stage + 1; % Advances from the completed cortical stage to the next inside-out milestone.
             state.phaseDirty = true;       % Requests a new maze and cue layout for the next developmental stage.
             build_stage(); % Regenerates the pathways and cue puzzle, making the maze itself change as learning progresses.
+            state.message = sprintf('Correct cue! +%d points - migration stage completed.',reward); % Re-asserts the reward feedback, since build_stage() above sets its own stage-intro message and would otherwise silently erase this one before it is ever shown.
+            state.messageUntil = toc(state.gameClock) + 1.8;                                        % Restores the intended short display window for the reward feedback.
         end                % Ends the final-stage versus next-stage decision.
     endfunction            % Ends the correct-cue reward function.
 
