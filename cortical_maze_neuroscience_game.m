@@ -3,6 +3,32 @@ function cortical_maze_neuroscience_game() % Launches the complete cortical-migr
 % The central concept is the inside-out lamination sequence: Layer VI, then V, then IV, then II/III, with Layer I/MZ as the final superficial stop. % Connects the game progression directly to the supplied corticogenesis material.
 % The maze also models radial versus tangential migration, radial-glial guidance, Reelin-dependent stopping, and adaptive shortcuts that mimic learning. % Explains the main mechanics before any executable logic begins.
 % The game is intentionally procedural, so every visual is generated with basic MATLAB/Octave graphics primitives and no external assets are needed. % Documents the graphics constraint required by the assignment.
+%
+% -----------------------------------------------------------------------------
+% FILE STRUCTURE (sections appear in this order below):
+%   1. MAIN SCRIPT BODY    - window setup, state initialization, main loop
+%   2. TIMING HELPER       - move_interval
+%   3. KEYBOARD INPUT      - key_handler
+%   4. GAME STATE SETUP    - reset_game, build_stage, generate_maze,
+%                             get_stage_info, stage_message
+%   5. MENU RENDERING      - render_menu
+%   6. GAMEPLAY RENDERING  - render_playfield, draw_layer_bands,
+%                             draw_maze_walls, draw_cues, neuron_process_points,
+%                             create_player_graphics, update_dynamic_graphics,
+%                             update_hud, render_guide, clear_guide
+%   7. CORE GAME LOGIC     - step_game, blocked_by_wall,
+%                             route_preference_bonus, cue_at_player,
+%                             handle_correct_cue, handle_wrong_cue,
+%                             place_replacement_cue, adapt_difficulty,
+%                             total_stages, inside_out_text
+%   8. END SCREEN          - render_end_screen
+% -----------------------------------------------------------------------------
+
+% =============================================================================
+% SECTION 1 - MAIN SCRIPT BODY
+% Creates the game window, initializes every state field, and runs the main
+% loop that dispatches to the menu, playing, or end-screen phase each frame.
+% =============================================================================
 
 close all; % Closes previously open figure windows so the game starts from a clean graphical state.
 clc; % Clears the command window so optional messages from the game are easier to read.
@@ -99,9 +125,19 @@ if ishandle(fig) % Checks whether the user closed the game window manually befor
     delete(fig); % Cleans up the figure object so the MATLAB/Octave session is left tidy.
 end % Ends the figure cleanup check.
 
+    % =========================================================================
+    % SECTION 2 - TIMING HELPER
+    % =========================================================================
+
     function dt = move_interval() % Returns the time in seconds between automatic cell movements and makes the arcade pace easy to modify.
         dt = 0.12; % Chooses roughly eight grid moves per second, which is fast enough to feel responsive but slow enough for deliberate maze decisions.
     end % Ends the move-interval helper function.
+
+    % =========================================================================
+    % SECTION 3 - KEYBOARD INPUT HANDLING
+    % Reads every key press and dispatches it to menu, movement, pause, help,
+    % quit, or restart actions depending on the current game phase.
+    % =========================================================================
 
     function key_handler(~,event) % Receives every key press from the figure and translates it into menu, movement, pause, help, or restart actions.
         key = lower(event.Key); % Normalizes the pressed key to lowercase so the controls behave identically with or without shift/caps lock.
@@ -183,6 +219,13 @@ end % Ends the figure cleanup check.
             end % Ends the results-screen key-choice logic.
         end % Ends the phase-dependent keyboard handler.
     end % Ends the keyboard callback function.
+
+    % =========================================================================
+    % SECTION 4 - GAME STATE SETUP & STAGE GENERATION
+    % Resets the run, procedurally generates each stage's maze, and defines
+    % the neuroscience content (target layer, correct marker, decoys) that
+    % drives every stage's puzzle.
+    % =========================================================================
 
     function reset_game() % Creates a fresh game state, builds the first maze, and prepares the first developmental challenge.
         state.phase = 'playing'; % Changes the state machine from menu or end screen into live gameplay.
@@ -371,6 +414,12 @@ end % Ends the figure cleanup check.
         end % Ends the stage-message selection.
     end % Ends the stage-message helper.
 
+    % =========================================================================
+    % SECTION 5 - MENU RENDERING
+    % Draws the launch screen: title, core idea, neuron-mode selection cards,
+    % controls, and the explicit win/lose rules.
+    % =========================================================================
+
     function render_menu() % Draws the start menu and explains the two neuron modes and the core game rules.
         cla(ax); % Clears the previous screen so the menu is visually clean and separate from any prior gameplay graphics.
         axis(ax,[0 31 0 24]); % Restores the full menu coordinate range after any gameplay-specific drawing changes.
@@ -414,6 +463,13 @@ end % Ends the figure cleanup check.
         text(15.5,1.85,'Press ENTER or SPACE to start','FontName','Arial','HorizontalAlignment','center','FontSize',18,'FontWeight','bold','Color',accentColor); % Gives a clear action prompt that starts the game, in the same accent color as the win condition and selected cards.
         state.phaseDirty = false; % Marks the menu as current so it is not redrawn unnecessarily until state changes again.
     end % Ends the menu-rendering function.
+
+    % =========================================================================
+    % SECTION 6 - GAMEPLAY RENDERING
+    % Draws and updates everything visible during an active run: the maze,
+    % cortical-layer bands, molecular cue balls, the neuron itself (soma,
+    % nucleus, dendrites, axon), the HUD, and the temporary memory guide.
+    % =========================================================================
 
     function render_playfield() % Draws the static maze, cortical-layer bands, molecular cues, and cartoon neuron for the current stage.
         cla(ax); % Clears old maze graphics and old cue icons before building the new stage view.
@@ -627,6 +683,12 @@ end % Ends the figure cleanup check.
         state.helpHandles = []; % Clears the stored handle list so the next guide display starts fresh.
     end % Ends the guide-clearing helper.
 
+    % =========================================================================
+    % SECTION 7 - CORE GAME LOGIC
+    % Handles movement, wall/boundary collisions, cue selection (correct and
+    % wrong), scoring, lives, stage transitions, and adaptive difficulty.
+    % =========================================================================
+
     function step_game() % Advances the neuron by one grid cell and resolves walls, route preferences, cue collection, score, and stage changes.
         if state.paused || state.gameOver % Stops all movement logic when the player has deliberately paused or the game has ended.
             return; % Leaves the function immediately so paused/end states remain stable until a key action changes them.
@@ -786,6 +848,12 @@ end % Ends the figure cleanup check.
     function txt = inside_out_text() % Returns a compact top-right reminder of the developmental order represented by the game.
         txt = 'Inside-out: VI -> V -> IV -> II/III -> I'; % Encodes the source's ordering in plain ASCII text for reliable cross-platform rendering.
     end % Ends the inside-out label helper.
+
+    % =========================================================================
+    % SECTION 8 - END SCREEN
+    % Draws the final win/lose results screen with the outcome and a short
+    % statistics summary, and offers restart/menu/quit options.
+    % =========================================================================
 
     function render_end_screen() % Draws the final win/lose screen with a clear outcome and a small reflective statistics summary.
         cla(ax); % Clears the last gameplay frame so the result screen is uncluttered.
