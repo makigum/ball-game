@@ -234,8 +234,10 @@ end % Ends the figure cleanup check.
         state.targetInfo = info; % Stores the stage description so the HUD and collision logic can refer to it later.
         if state.mode == 2 && state.stage == 1 % Checks for the special interneuron-only entry stage.
             baseRows = [4 5 6]; % Places the first target near the lower cortical border so the player must travel tangentially from the MGE/CGE side.
-            state.correctCue = randi(3); % Randomizes which cue position contains the correct cortical-entry signal so memorizing one location is impossible.
-            state.cueLabels = {'Enter cortex','Stay tangential','Reverse migration'}; % Gives the entry stage three conceptual choices so the player must recognize the correct migration strategy rather than simply selecting any identical icon.
+            entryLabels = {'Enter cortex','Stay tangential','Reverse migration'}; % Defines the entry stage's one correct conceptual choice plus two wrong migration strategies.
+            entryOrder = randperm(3); % Randomizes the display order so the correct choice is not always in the same position.
+            state.cueLabels = entryLabels(entryOrder); % Places the three labels at randomized positions, matching how the ordinary marker stages randomize their choices.
+            state.correctCue = find(entryOrder == 1); % Finds wherever "Enter cortex" (always entryLabels{1}) actually landed, so the correct answer matches the correct text instead of a position picked independently of it.
         else % Handles the ordinary layer-and-marker stages shared by both neuron modes.
             baseRows = info.rowRange; % Uses the target layer's row range so cue choices visually correspond to the correct cortical depth.
             state.correctCue = randi(3); % Randomizes the spatial position of the correct molecular marker on every stage.
@@ -595,13 +597,25 @@ end % Ends the figure cleanup check.
         clear_guide(); % Clears any previous version so the guide can be redrawn cleanly after a new H press.
         state.helpHandles(1) = patch([2.0 11.0 11.0 2.0],[3.0 3.0 18.0 18.0],[0.99 0.98 0.92],'EdgeColor',[0.76 0.66 0.40],'LineWidth',1.2); % Stores the memory-card background so it can be deleted cleanly when the three-second aid expires.
         state.helpHandles(2) = text(6.5,17.2,'MEMORY GUIDE','FontName','Arial','HorizontalAlignment','center','FontSize',12,'FontWeight','bold','Color',[0.39 0.33 0.20]); % Stores the guide title as a temporary graphics handle.
-        state.helpHandles(3) = text(6.5,15.7,'VI  ->  Tbr1','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer VI mapping derived from the supplied source.
-        state.helpHandles(4) = text(6.5,14.3,'V   ->  Ctip2','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer V mapping from the supplied source.
-        state.helpHandles(5) = text(6.5,12.9,'IV  ->  Rorb','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer IV mapping from the supplied source.
-        state.helpHandles(6) = text(6.5,11.5,'II/III -> Cux1/2','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the upper-layer mapping from the supplied source.
-        state.helpHandles(7) = text(6.5,10.1,'I/MZ -> Reelin','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the marginal-zone Reelin mapping from the supplied source.
-        state.helpHandles(8) = text(6.5,7.6,'Press H again to refresh','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.46 0.42 0.34]); % Stores the reminder that the memory support is temporary.
-        state.helpHandles(9) = text(6.5,6.5,'Guide use costs 3 points','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.55 0.45 0.32]); % Stores the reminder that externalizing the memory has a small strategic cost.
+        if state.mode == 2 && state.stage == 1 % Checks whether the player is an interneuron still on the tangential cortical-entry stage, where the layer-marker table below does not apply yet.
+            state.helpHandles(3) = text(6.5,15.6,'You start in the','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Explains the interneuron's unique starting location before any marker-matching begins.
+            state.helpHandles(4) = text(6.5,14.6,'MGE/CGE (purple zone).','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Names the visible purple-tinted region so the player can connect the text to the maze.
+            state.helpHandles(5) = text(6.5,13.2,'Migrate tangentially to','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % States the required movement style for this stage only.
+            state.helpHandles(6) = text(6.5,12.2,'reach the cortex, then','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Continues the sentence onto a second line so it stays short enough to fit the card.
+            state.helpHandles(7) = text(6.5,11.2,'touch "Enter cortex".','FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.32 0.36 0.44]); % Names the single correct cue in bold since this stage has no partial credit.
+            state.helpHandles(8) = text(6.5,9.8,'"Stay tangential" and','FontName','Arial','HorizontalAlignment','center','FontSize',9,'Color',[0.55 0.33 0.30]); % Begins naming the two wrong choices so the player does not pick them by sounding plausible.
+            state.helpHandles(9) = text(6.5,8.9,'"Reverse migration" are wrong.','FontName','Arial','HorizontalAlignment','center','FontSize',9,'Color',[0.55 0.33 0.30]); % Finishes naming both wrong choices explicitly.
+            state.helpHandles(10) = text(6.5,6.9,'Press H again to refresh','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.46 0.42 0.34]); % Stores the reminder that the memory support is temporary.
+            state.helpHandles(11) = text(6.5,5.8,'Guide use costs 3 points','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.55 0.45 0.32]); % Stores the reminder that externalizing the memory has a small strategic cost.
+        else % Handles every pyramidal stage and every interneuron stage after cortical entry, where the layer-to-marker table is the relevant memory aid.
+            state.helpHandles(3) = text(6.5,15.7,'VI  ->  Tbr1','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer VI mapping derived from the supplied source.
+            state.helpHandles(4) = text(6.5,14.3,'V   ->  Ctip2','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer V mapping from the supplied source.
+            state.helpHandles(5) = text(6.5,12.9,'IV  ->  Rorb','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the Layer IV mapping from the supplied source.
+            state.helpHandles(6) = text(6.5,11.5,'II/III -> Cux1/2','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the upper-layer mapping from the supplied source.
+            state.helpHandles(7) = text(6.5,10.1,'I/MZ -> Reelin','FontName','Arial','HorizontalAlignment','center','FontSize',10,'Color',[0.32 0.36 0.44]); % Stores the marginal-zone Reelin mapping from the supplied source.
+            state.helpHandles(8) = text(6.5,7.6,'Press H again to refresh','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.46 0.42 0.34]); % Stores the reminder that the memory support is temporary.
+            state.helpHandles(9) = text(6.5,6.5,'Guide use costs 3 points','FontName','Arial','HorizontalAlignment','center','FontSize',8,'Color',[0.55 0.45 0.32]); % Stores the reminder that externalizing the memory has a small strategic cost.
+        end % Ends the stage-dependent guide content selection.
     end % Ends the field-guide renderer.
 
     function clear_guide() % Deletes the temporary field-guide text and panel so the maze becomes the main focus again.
