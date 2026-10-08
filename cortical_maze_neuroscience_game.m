@@ -420,11 +420,11 @@ end % Ends the figure cleanup check.
         axis(ax,'off'); % Hides normal axes because the game's labels and boundaries are manually drawn.
         hold(ax,'on'); % Keeps all procedural shapes layered in a single canvas.
         draw_layer_bands(); % Paints the cortical compartments and labels them from ventricular side to marginal zone.
-        draw_maze_walls(); % Draws every carved maze boundary as a soft cartoon-like line.
         if state.mode == 2 % Checks whether the player selected the interneuron mode.
-            patch([0.5 4.5 4.5 0.5],[1.0 1.0 9.5 9.5],[0.93 0.87 0.96],'EdgeColor',[0.67 0.52 0.68],'LineWidth',1.2); % Tints the left strip to visually represent the MGE/CGE-like subpallial source region.
+            patch([0.5 4.5 4.5 0.5],[1.0 1.0 9.5 9.5],[0.93 0.87 0.96],'EdgeColor',[0.67 0.52 0.68],'LineWidth',1.2); % Tints the left strip to visually represent the MGE/CGE-like subpallial source region. Drawn before the maze walls (like the layer bands) so it stays a background tint instead of an opaque block hiding the maze.
             text(2.5,8.8,'MGE/CGE','FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.49 0.34 0.51]); % Labels the source region so the tangential route has an anatomical anchor.
         end % Ends the interneuron source-zone drawing.
+        draw_maze_walls(); % Draws every carved maze boundary as a soft cartoon-like line, now on top of every background tint so the labyrinth is always visible.
         text(27.4,22.6,inside_out_text(),'FontName','Arial','HorizontalAlignment','center','FontSize',10,'FontWeight','bold','Color',[0.22 0.32 0.50]); % Shows the developmental order at the top right as a compact navigation memory cue.
         text(3.7,20.8,'radial glia-like scaffold','FontName','Arial','HorizontalAlignment','center','FontSize',9,'Color',[0.34 0.50 0.58]); % Reminds the player that radial migration follows a scaffold represented by the grid pathways.
         draw_cues(); % Creates the three molecular-cue icons and their labels for the current stage.
